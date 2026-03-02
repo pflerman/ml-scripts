@@ -1,0 +1,20 @@
+# Credentials
+config/ml_credentials_*.json
+
+# Database
+data/*.db
+data/*.db-journal
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+
+# Logs
+*.log
+
+# Virtual env
+venv/
+env/
