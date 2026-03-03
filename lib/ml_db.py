@@ -3,9 +3,19 @@ Manejo de base de datos SQLite para cache de productos
 """
 import json
 import sqlite3
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, Dict, List
+
+
+def _normalizar(texto: str) -> str:
+    """Quita acentos y pasa a minúsculas para comparación sin tildes"""
+    if not texto:
+        return ""
+    texto = unicodedata.normalize('NFD', texto)
+    texto = ''.join(c for c in texto if unicodedata.category(c) != 'Mn')
+    return texto.lower()
 
 
 class ProductDatabase:
@@ -242,27 +252,21 @@ class ProductDatabase:
         ]
 
     def search_products_by_title(self, keywords: List[str], status: str = 'active') -> List[Dict]:
-        """Busca productos por palabra(s) clave en el título"""
+        """Busca productos por palabra(s) clave en el título, ignorando acentos"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        query = '''
+        cursor.execute('''
             SELECT item_id, title, price, available_quantity, sold_quantity, status
             FROM products
             WHERE status = ?
-        '''
-
-        params = [status]
-
-        for keyword in keywords:
-            query += " AND LOWER(title) LIKE ?"
-            params.append(f"%{keyword.lower()}%")
-
-        query += " ORDER BY title"
-
-        cursor.execute(query, params)
+            ORDER BY title
+        ''', (status,))
         rows = cursor.fetchall()
         conn.close()
+
+        # Filtrar en Python con comparación normalizada (ignora acentos)
+        normalized_keywords = [_normalizar(kw) for kw in keywords]
 
         return [
             {
@@ -274,6 +278,7 @@ class ProductDatabase:
                 'status': row[5]
             }
             for row in rows
+            if all(kw in _normalizar(row[1] or '') for kw in normalized_keywords)
         ]
 
     def get_product_by_id(self, item_id: str) -> Optional[Dict]:
